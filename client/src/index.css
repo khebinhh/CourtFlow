@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(210 25% 7.8431%);
+  --card: hsl(180 6.6667% 97.0588%);
+  --card-foreground: hsl(210 25% 7.8431%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(210 25% 7.8431%);
+  --primary: hsl(205 100% 36%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(168 76% 42%);
+  --secondary-foreground: hsl(0 0% 100%);
+  --muted: hsl(240 1.9608% 90%);
+  --muted-foreground: hsl(210 25% 7.8431%);
+  --accent: hsl(32 95% 44%);
+  --accent-foreground: hsl(0 0% 100%);
+  --destructive: hsl(0 84% 60%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(201.4286 30.4348% 90.9804%);
+  --input: hsl(200 23.0769% 97.4510%);
+  --ring: hsl(205 100% 36%);
+  --chart-1: hsl(205 100% 36%);
+  --chart-2: hsl(168 76% 42%);
+  --chart-3: hsl(32 95% 44%);
+  --chart-4: hsl(205 100% 21%);
+  --chart-5: hsl(341.4894 75.2000% 50.9804%);
+  --sidebar: hsl(180 6.6667% 97.0588%);
+  --sidebar-foreground: hsl(210 25% 7.8431%);
+  --sidebar-primary: hsl(205 100% 36%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(168 76% 42%);
+  --sidebar-accent-foreground: hsl(0 0% 100%);
+  --sidebar-border: hsl(205.0000 25.0000% 90.5882%);
+  --sidebar-ring: hsl(205 100% 36%);
+  --font-sans: 'Inter', sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: Menlo, monospace;
+  --radius: 0.75rem;
+  
+  /* iTennis/iPickle brand colors */
+  --brand-primary: hsl(205 100% 36%);
+  --brand-secondary: hsl(168 76% 42%);
+  --brand-accent: hsl(32 95% 44%);
+  --brand-dark: hsl(205 100% 21%);
+  
+  /* Court status gradients */
+  --court-available: linear-gradient(135deg, hsl(168 76% 42%), hsl(168 69% 58%));
+  --court-booked: linear-gradient(135deg, hsl(0 84% 60%), hsl(0 91% 71%));
+  --court-maintenance: linear-gradient(135deg, hsl(32 95% 44%), hsl(32 96% 40%));
+  --coach-lesson: linear-gradient(135deg, hsl(205 100% 36%), hsl(205 70% 50%));
+}
+
+.dark {
+  --background: hsl(0 0% 0%);
+  --foreground: hsl(200 6.6667% 91.1765%);
+  --card: hsl(228 9.8039% 10%);
+  --card-foreground: hsl(0 0% 85.0980%);
+  --popover: hsl(0 0% 0%);
+  --popover-foreground: hsl(200 6.6667% 91.1765%);
+  --primary: hsl(205 100% 36%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(195.0000 15.3846% 94.9020%);
+  --secondary-foreground: hsl(210 25% 7.8431%);
+  --muted: hsl(0 0% 9.4118%);
+  --muted-foreground: hsl(210 3.3898% 46.2745%);
+  --accent: hsl(168 76% 42%);
+  --accent-foreground: hsl(0 0% 100%);
+  --destructive: hsl(0 84% 60%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(210 5.2632% 14.9020%);
+  --input: hsl(207.6923 27.6596% 18.4314%);
+  --ring: hsl(205 100% 36%);
+  --sidebar: hsl(228 9.8039% 10%);
+  --sidebar-foreground: hsl(0 0% 85.0980%);
+  --sidebar-primary: hsl(205 100% 36%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(168 76% 42%);
+  --sidebar-accent-foreground: hsl(0 0% 100%);
+  --sidebar-border: hsl(205.7143 15.7895% 26.0784%);
+  --sidebar-ring: hsl(205 100% 36%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .court-available {
+    background: var(--court-available);
+  }
+  
+  .court-booked {
+    background: var(--court-booked);
+  }
+  
+  .court-maintenance {
+    background: var(--court-maintenance);
+  }
+  
+  .coach-lesson {
+    background: var(--coach-lesson);
+  }
+  
+  .brand-primary {
+    background-color: var(--brand-primary);
+  }
+  
+  .brand-secondary {
+    background-color: var(--brand-secondary);
+  }
+  
+  .brand-accent {
+    background-color: var(--brand-accent);
+  }
+  
+  .brand-dark {
+    background-color: var(--brand-dark);
+  }
+}
