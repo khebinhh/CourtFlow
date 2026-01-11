@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { user } = await response.json();
         setUser(user);
         localStorage.setItem("user", JSON.stringify(user));
-        setLocation("/");
+        setLocation("/court-calendar");
         return true;
       }
       return false;

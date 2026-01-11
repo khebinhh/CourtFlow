@@ -250,10 +250,11 @@ export default function CourtCalendar() {
   // Update booking mutation
   const updateBookingMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
-      return await apiRequest(`/api/bookings/${id}`, "PATCH", updates);
+      return await apiRequest(`/api/bookings/${id}`, "PUT", updates);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/bookings"] });
       toast({
         title: "Booking Updated",
         description: "Booking has been updated successfully",
@@ -678,7 +679,7 @@ export default function CourtCalendar() {
   return (
     <div className="h-screen flex bg-gray-50 overflow-hidden">
       {/* Main Calendar Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Header */}
         <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -729,7 +730,7 @@ export default function CourtCalendar() {
         </div>
 
         {/* Calendar Grid - Scrollable Container */}
-        <div className="flex-1 flex flex-col bg-white overflow-hidden" ref={calendarRef}>
+        <div className="flex-1 flex flex-col bg-white overflow-hidden min-h-0" ref={calendarRef}>
           {/* Fixed Court Headers Row */}
           <div className="flex border-b bg-gray-50 flex-shrink-0">
             <div className="w-16 flex-shrink-0 border-r"></div>
@@ -753,7 +754,7 @@ export default function CourtCalendar() {
                 {timeSlots.map((slot) => (
                   <div
                     key={slot.time}
-                    className="relative border-b border-gray-100"
+                    className={`relative border-b border-gray-200 ${slot.minute === 0 ? "border-t-2 border-t-[#1e3a5f]" : ""}`}
                     style={{ height: `${SLOT_HEIGHT}px` }}
                   >
                     {slot.minute === 0 && (
@@ -800,9 +801,9 @@ export default function CourtCalendar() {
                         return (
                           <div
                             key={slot.time}
-                            className={`border-b hover:bg-blue-50 cursor-pointer transition-colors ${
+                            className={`border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors ${
                               isInRange ? "bg-blue-100" : ""
-                            } ${isHourMark ? "border-gray-300" : "border-gray-100"}`}
+                            } ${isHourMark ? "border-t-2 border-t-[#1e3a5f]" : ""}`}
                             style={{ height: `${SLOT_HEIGHT}px` }}
                             onClick={(e) =>
                               !isDragging && handleTimeSlotClick(court, slot, e)
@@ -892,6 +893,59 @@ export default function CourtCalendar() {
                         </div>
                       );
                     })}
+
+                  {/* Real-time Preview Booking - Shows while creating */}
+                  {popoverOpen && selectedSlot && formData.courtId === court.id && formData.startTime && (() => {
+                    const endTime = calculateEndTime(formData.startTime, formData.duration);
+                    const [startHour, startMinute] = formData.startTime.split(":").map(Number);
+                    const [endHour, endMinute] = endTime.split(":").map(Number);
+                    
+                    const startMinutesSince6AM = (startHour - START_HOUR) * 60 + startMinute;
+                    const endMinutesSince6AM = (endHour - START_HOUR) * 60 + endMinute;
+                    
+                    const top = (startMinutesSince6AM / 15) * SLOT_HEIGHT;
+                    const height = ((endMinutesSince6AM - startMinutesSince6AM) / 15) * SLOT_HEIGHT;
+                    
+                    if (startMinutesSince6AM < 0) return null;
+                    
+                    const previewTypeColors: Record<string, string> = {
+                      regular: "bg-blue-400",
+                      class: "bg-green-400",
+                      event: "bg-orange-400",
+                      maintenance: "bg-gray-400",
+                    };
+                    
+                    const formatPreviewTime = (time: string) => {
+                      const [hours, minutes] = time.split(":").map(Number);
+                      const normalizedHours = hours % 24;
+                      const period = normalizedHours >= 12 ? "PM" : "AM";
+                      const displayHours = normalizedHours === 0 ? 12 : normalizedHours > 12 ? normalizedHours - 12 : normalizedHours;
+                      return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
+                    };
+                    
+                    const displayName = formData.bookingType === "class" 
+                      ? (formData.description || "Class")
+                      : formData.bookingType === "event"
+                      ? (formData.description || "Event")
+                      : formData.bookingType === "maintenance"
+                      ? "Maintenance"
+                      : (selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : formData.customerName || "(No title)");
+                    
+                    return (
+                      <div
+                        className={`absolute left-1 right-1 rounded px-2 py-1 ${previewTypeColors[formData.bookingType]} text-white shadow-lg border-2 border-dashed border-white/50 opacity-80 pointer-events-none z-30`}
+                        style={{
+                          top: `${top}px`,
+                          height: `${Math.max(height - 4, SLOT_HEIGHT - 4)}px`,
+                        }}
+                      >
+                        <div className="text-xs font-medium truncate">{displayName}</div>
+                        <div className="text-xs opacity-90">
+                          {formatPreviewTime(formData.startTime)} - {formatPreviewTime(endTime)}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
@@ -952,175 +1006,204 @@ export default function CourtCalendar() {
         </div>
       </div>
 
-      {/* Booking Popover */}
+      {/* Hover Tooltip for Reservations */}
+      {hoveredBooking && !popoverOpen && !editingBooking && (
+        <div 
+          className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-72 pointer-events-none"
+          style={{
+            top: "50%",
+            right: "340px",
+            transform: "translateY(-50%)",
+          }}
+        >
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded"
+                style={{ backgroundColor: hoveredBooking.type === "class" ? "#9FC490" : hoveredBooking.type === "event" ? "#F79824" : hoveredBooking.type === "maintenance" ? "#6b7280" : "#3b82f6" }}
+              />
+              <span className="font-semibold text-gray-900">
+                {hoveredBooking.type === "class" 
+                  ? (hoveredBooking.description || "Class")
+                  : hoveredBooking.type === "event"
+                  ? (hoveredBooking.description || "Event")
+                  : hoveredBooking.type === "maintenance"
+                  ? "Maintenance"
+                  : `${hoveredBooking.user?.firstName} ${hoveredBooking.user?.lastName}`}
+              </span>
+            </div>
+            
+            <div className="text-sm text-gray-600 space-y-1">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-gray-400" />
+                <span>
+                  {(() => {
+                    const formatTime = (time: string) => {
+                      const [hours, minutes] = time.split(":").map(Number);
+                      const period = hours >= 12 ? "PM" : "AM";
+                      const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+                      return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
+                    };
+                    return `${formatTime(hoveredBooking.startTime)} - ${formatTime(hoveredBooking.endTime)}`;
+                  })()}
+                </span>
+              </div>
+              
+              {(hoveredBooking.type === "regular" || hoveredBooking.type === "lesson") && hoveredBooking.user?.email && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-400" />
+                  <span className="truncate">{hoveredBooking.user.email}</span>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 flex items-center justify-center">
+                  <span className="text-xs">📍</span>
+                </div>
+                <span>{courts.find(c => c.id === hoveredBooking.courtId)?.name || "Court"}</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between pt-2 border-t">
+              <Badge variant={hoveredBooking.status === "confirmed" ? "default" : hoveredBooking.status === "pending" ? "secondary" : "outline"}>
+                {hoveredBooking.status}
+              </Badge>
+              <span className="text-xs text-gray-400">Double-click to edit</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Booking Popover - Google Calendar Style */}
       {popoverOpen && selectedSlot && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-end pr-8"
+          className="fixed inset-0 z-50 flex items-start justify-center pt-20"
           onClick={() => setPopoverOpen(false)}
         >
           <div
-            className="bg-gradient-to-br from-blue-50 to-teal-50 border-l-4 border-l-blue-500 rounded-lg shadow-xl border p-4 w-96 max-h-[80vh] overflow-y-auto"
+            className="bg-white rounded-lg shadow-2xl w-[360px] max-h-[80vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">New Reservation</h3>
-              <Button
-                variant="ghost"
-                size="sm"
+            {/* Header with close button */}
+            <div className="flex items-center justify-end p-2 border-b">
+              <button
+                type="button"
                 onClick={() => setPopoverOpen(false)}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
               >
-                <X className="h-4 w-4" />
-              </Button>
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3">
-              {/* Booking Type Selection */}
-              <div className="bg-white p-3 rounded border">
-                <Label className="text-xs font-medium text-gray-700 block mb-2">
-                  Booking Type
-                </Label>
-                <div className="grid grid-cols-4 gap-2">
-                  <Button
-                    type="button"
-                    variant={
-                      formData.bookingType === "regular" ? "default" : "outline"
-                    }
-                    size="sm"
-                    onClick={() =>
-                      setFormData({ ...formData, bookingType: "regular" })
-                    }
-                    className={`text-xs ${formData.bookingType === "regular" ? "bg-blue-500 hover:bg-blue-600" : "border-blue-300 text-blue-600 hover:bg-blue-50"}`}
-                    style={{
-                      backgroundColor:
-                        formData.bookingType === "regular" ? "#3b82f6" : "",
-                    }}
-                  >
-                    Regular
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={
-                      formData.bookingType === "class" ? "default" : "outline"
-                    }
-                    size="sm"
-                    onClick={() =>
-                      setFormData({ ...formData, bookingType: "class" })
-                    }
-                    className={`text-xs ${formData.bookingType === "class" ? "text-white" : "text-green-600 hover:bg-green-50"}`}
-                    style={{
-                      backgroundColor:
-                        formData.bookingType === "class" ? "#9FC490" : "",
-                      borderColor:
-                        formData.bookingType !== "class" ? "#9FC490" : "",
-                    }}
-                  >
-                    Class
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={
-                      formData.bookingType === "event" ? "default" : "outline"
-                    }
-                    size="sm"
-                    onClick={() =>
-                      setFormData({ ...formData, bookingType: "event" })
-                    }
-                    className={`text-xs ${formData.bookingType === "event" ? "text-white" : "text-orange-600 hover:bg-orange-50"}`}
-                    style={{
-                      backgroundColor:
-                        formData.bookingType === "event" ? "#F79824" : "",
-                      borderColor:
-                        formData.bookingType !== "event" ? "#F79824" : "",
-                    }}
-                  >
-                    Event
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={
-                      formData.bookingType === "maintenance"
-                        ? "default"
-                        : "outline"
-                    }
-                    size="sm"
-                    onClick={() =>
-                      setFormData({ ...formData, bookingType: "maintenance" })
-                    }
-                    className={`text-xs ${formData.bookingType === "maintenance" ? "text-white" : "text-gray-600 hover:bg-gray-50"}`}
-                    style={{
-                      backgroundColor:
-                        formData.bookingType === "maintenance" ? "#6b7280" : "",
-                      borderColor:
-                        formData.bookingType !== "maintenance" ? "#6b7280" : "",
-                    }}
-                  >
-                    Maintenance
-                  </Button>
+            <form onSubmit={handleSubmit} className="p-4 space-y-4">
+              {/* Booking Type Tabs - Google Calendar Style */}
+              <div className="flex border-b">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, bookingType: "regular" })}
+                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    formData.bookingType === "regular"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Regular
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, bookingType: "class" })}
+                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    formData.bookingType === "class"
+                      ? "border-green-500 text-green-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Class
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, bookingType: "event" })}
+                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    formData.bookingType === "event"
+                      ? "border-orange-500 text-orange-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Event
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, bookingType: "maintenance" })}
+                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    formData.bookingType === "maintenance"
+                      ? "border-gray-500 text-gray-700"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Maint.
+                </button>
+              </div>
+
+              {/* Time & Court Info - Inline like Google Calendar */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-gray-700">
+                  <Clock className="h-5 w-5 text-gray-400" />
+                  <div className="flex-1">
+                    <div className="font-medium">{format(selectedDate, "EEEE, MMMM d, yyyy")}</div>
+                    <div className="text-sm text-gray-500">
+                      {selectedSlot.time.display} - {(() => {
+                        const endTime = calculateEndTime(selectedSlot.time.time, formData.duration);
+                        const [hours, minutes] = endTime.split(":").map(Number);
+                        const normalizedHours = hours % 24;
+                        const period = normalizedHours >= 12 ? "PM" : "AM";
+                        const displayHours = normalizedHours === 0 ? 12 : normalizedHours > 12 ? normalizedHours - 12 : normalizedHours;
+                        return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-gray-700">
+                  <div className="h-5 w-5 flex items-center justify-center">
+                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">{selectedSlot.court.name}</div>
+                    <div className="text-sm text-gray-500">${selectedSlot.court.hourlyRate}/hr</div>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs font-medium text-blue-700">
-                    Court
-                  </Label>
-                  <Input
-                    value={selectedSlot.court.name}
-                    disabled
-                    className="h-8 text-sm bg-blue-100 border-blue-200"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs font-medium text-blue-700">
-                    Date
-                  </Label>
-                  <Input
-                    value={format(selectedDate, "MM/dd/yyyy")}
-                    disabled
-                    className="h-8 text-sm bg-blue-100 border-blue-200"
-                  />
-                </div>
+              {/* Duration Selector */}
+              <div>
+                <Label className="text-xs text-gray-500 mb-1 block">Duration</Label>
+                <Select
+                  value={formData.duration}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, duration: value })
+                  }
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0.5">30 min</SelectItem>
+                    <SelectItem value="1">1 hour</SelectItem>
+                    <SelectItem value="1.5">1.5 hours</SelectItem>
+                    <SelectItem value="2">2 hours</SelectItem>
+                    <SelectItem value="3">3 hours</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">Start Time</Label>
-                  <Input
-                    value={selectedSlot.time.display}
-                    disabled
-                    className="h-8 text-sm"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Duration (hours)</Label>
-                  <Select
-                    value={formData.duration}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, duration: value })
-                    }
-                  >
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0.5">30 min</SelectItem>
-                      <SelectItem value="1">1 hour</SelectItem>
-                      <SelectItem value="1.5">1.5 hours</SelectItem>
-                      <SelectItem value="2">2 hours</SelectItem>
-                      <SelectItem value="3">3 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Customer Selection */}
-              {/* Customer Section - Only for regular bookings and events */}
+              {/* Customer Selection - Google Calendar Style */}
               {(formData.bookingType === "regular" ||
                 formData.bookingType === "event") && (
-                <div className="bg-white p-3 rounded border border-teal-200">
-                  <Label className="text-xs font-medium text-teal-700">
-                    Customer Information
-                  </Label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <User className="h-5 w-5 text-gray-400" />
+                    <span className="text-sm text-gray-600">Add guest</span>
+                  </div>
                   <div className="space-y-2">
                     <div className="relative">
                       <Input
@@ -1533,40 +1616,32 @@ export default function CourtCalendar() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-2">
-                {formData.bookingType === "regular" && (
-                  <div className="text-sm">
-                    <span className="text-gray-600">Total: </span>
-                    <span className="font-semibold">${calculateTotal()}</span>
-                  </div>
-                )}
-                {formData.bookingType === "class" && (
-                  <div className="text-sm text-green-600 font-medium">
-                    Class Booking - FREE
-                  </div>
-                )}
-                {formData.bookingType === "event" && (
-                  <div className="text-sm text-orange-600 font-medium">
-                    Event Booking - FREE
-                  </div>
-                )}
-                {formData.bookingType === "maintenance" && (
-                  <div className="text-sm text-gray-600 font-medium">
-                    Maintenance Block - No Charge
-                  </div>
-                )}
-                <div className="space-x-2">
-                  <Button
+              {/* Footer - Google Calendar Style */}
+              <div className="flex items-center justify-between pt-4 border-t mt-4">
+                <div className="text-sm">
+                  {formData.bookingType === "regular" && (
+                    <span className="font-medium">${calculateTotal()}</span>
+                  )}
+                  {formData.bookingType === "class" && (
+                    <span className="text-green-600">Free</span>
+                  )}
+                  {formData.bookingType === "event" && (
+                    <span className="text-orange-600">Free</span>
+                  )}
+                  {formData.bookingType === "maintenance" && (
+                    <span className="text-gray-500">No Charge</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
                     type="button"
-                    variant="outline"
-                    size="sm"
                     onClick={() => setPopoverOpen(false)}
+                    className="text-sm text-gray-600 hover:text-gray-800 font-medium"
                   >
                     Cancel
-                  </Button>
+                  </button>
                   <Button
                     type="submit"
-                    size="sm"
                     disabled={
                       createBookingMutation.isPending ||
                       ((formData.bookingType === "regular" ||
@@ -1574,12 +1649,10 @@ export default function CourtCalendar() {
                         !isNewCustomer &&
                         !selectedCustomer)
                     }
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6"
                     data-testid="button-save-booking"
                   >
-                    {createBookingMutation.isPending
-                      ? "Saving..."
-                      : "Save Booking"}
+                    {createBookingMutation.isPending ? "Saving..." : "Save"}
                   </Button>
                 </div>
               </div>
