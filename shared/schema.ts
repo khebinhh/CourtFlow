@@ -18,6 +18,7 @@ export const users = pgTable("users", {
 export const courts = pgTable("courts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  courtType: text("court_type").$type<"tennis" | "pickleball">().notNull().default("tennis"),
   surfaceType: text("surface_type").$type<"hard" | "clay" | "grass">().notNull(),
   status: text("status").$type<"active" | "maintenance" | "inactive">().notNull().default("active"),
   hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }).notNull(),

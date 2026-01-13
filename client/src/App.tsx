@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/use-auth";
+import { SidebarProvider, useSidebar } from "@/contexts/sidebar-context";
 import Dashboard from "@/pages/dashboard";
 import Courts from "@/pages/courts";
 import Bookings from "@/pages/bookings";
@@ -34,12 +35,13 @@ function Router() {
 
 function AppContent() {
   const [location] = useLocation();
+  const { isCollapsed } = useSidebar();
   const isLoginPage = location === "/login";
   
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {!isLoginPage && <Sidebar />}
-      <main className={`flex-1 ${!isLoginPage ? "lg:ml-64" : ""} pb-20 lg:pb-0`}>
+      <main className={`flex-1 ${!isLoginPage ? (isCollapsed ? "lg:ml-20" : "lg:ml-64") : ""} pb-20 lg:pb-0 transition-all duration-300`}>
         <Router />
       </main>
     </div>
@@ -51,8 +53,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <AppContent />
-          <Toaster />
+          <SidebarProvider>
+            <AppContent />
+            <Toaster />
+          </SidebarProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

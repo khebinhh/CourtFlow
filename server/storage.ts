@@ -79,11 +79,12 @@ export class MemStorage implements IStorage {
     const court1: Court = {
       id: court1Id,
       name: "Tennis Court 1",
+      courtType: "tennis",
       surfaceType: "hard",
       status: "active",
       hourlyRate: "25.00",
       peakHourlyRate: "35.00",
-      openTime: "06:00",
+      openTime: "07:30",
       closeTime: "23:00",
       description: "Professional tennis hard court with excellent lighting for iTennis players",
       imageUrl: "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?ixlib=rb-4.0.3",
@@ -95,33 +96,18 @@ export class MemStorage implements IStorage {
     const court2: Court = {
       id: court2Id,
       name: "Pickleball Court 1",
+      courtType: "pickleball",
       surfaceType: "hard",
       status: "active",
       hourlyRate: "20.00",
       peakHourlyRate: "28.00",
-      openTime: "06:00",
+      openTime: "07:30",
       closeTime: "23:00",
       description: "Dedicated pickleball court with regulation dimensions for iPickle players",
       imageUrl: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?ixlib=rb-4.0.3",
       createdAt: new Date(),
     };
     this.courts.set(court2Id, court2);
-
-    const court3Id = randomUUID();
-    const court3: Court = {
-      id: court3Id,
-      name: "Multi-Purpose Court",
-      surfaceType: "hard",
-      status: "active",
-      hourlyRate: "30.00",
-      peakHourlyRate: "40.00",
-      openTime: "06:00",
-      closeTime: "23:00",
-      description: "Versatile court for both tennis and pickleball with convertible nets",
-      imageUrl: "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?ixlib=rb-4.0.3",
-      createdAt: new Date(),
-    };
-    this.courts.set(court3Id, court3);
   }
 
   // User methods
@@ -175,14 +161,18 @@ export class MemStorage implements IStorage {
   async createCourt(insertCourt: InsertCourt): Promise<Court> {
     const id = randomUUID();
     const court: Court = { 
-      ...insertCourt,
       id, 
-      createdAt: new Date(),
-      status: (insertCourt.status as any) || 'active',
+      name: insertCourt.name,
+      courtType: (insertCourt.courtType || 'tennis') as "tennis" | "pickleball",
+      surfaceType: insertCourt.surfaceType as "hard" | "clay" | "grass",
+      status: (insertCourt.status || 'active') as "active" | "maintenance" | "inactive",
+      hourlyRate: insertCourt.hourlyRate,
+      peakHourlyRate: insertCourt.peakHourlyRate,
       openTime: insertCourt.openTime || '06:00',
       closeTime: insertCourt.closeTime || '22:00',
       description: insertCourt.description || null,
       imageUrl: insertCourt.imageUrl || null,
+      createdAt: new Date(),
     };
     this.courts.set(id, court);
     return court;
@@ -192,7 +182,11 @@ export class MemStorage implements IStorage {
     const court = this.courts.get(id);
     if (!court) return undefined;
     
-    const updatedCourt = { ...court, ...updates };
+    const updatedCourt = { 
+      ...court, 
+      ...updates,
+      courtType: (updates.courtType || court.courtType || 'tennis') as "tennis" | "pickleball",
+    };
     this.courts.set(id, updatedCourt);
     return updatedCourt;
   }
@@ -318,11 +312,13 @@ export class MemStorage implements IStorage {
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
     const id = randomUUID();
     const payment: Payment = { 
-      ...insertPayment,
       id, 
-      createdAt: new Date(),
-      status: (insertPayment.status as any) || 'completed',
+      bookingId: insertPayment.bookingId,
+      amount: insertPayment.amount,
+      method: insertPayment.method as "credit_card" | "apple_pay" | "google_pay" | "paypal",
+      status: (insertPayment.status || 'completed') as "pending" | "completed" | "failed" | "refunded",
       transactionId: insertPayment.transactionId || null,
+      createdAt: new Date(),
     };
     this.payments.set(id, payment);
     return payment;

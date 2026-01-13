@@ -18,13 +18,16 @@ import {
   X,
   MapPin,
   Clock,
-  DollarSign
+  DollarSign,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Court, InsertCourt } from "@shared/schema";
 
 interface CourtFormData {
   name: string;
+  courtType: "tennis" | "pickleball";
   surfaceType: "hard" | "clay" | "grass";
   status: "active" | "maintenance" | "inactive";
   hourlyRate: string;
@@ -57,8 +60,11 @@ export default function AdminSettings() {
     lastName: "",
     phone: "",
   });
+  const [courtsExpanded, setCourtsExpanded] = useState(false);
+  const [courtTypeFilter, setCourtTypeFilter] = useState<"tennis" | "pickleball">("tennis");
   const [formData, setFormData] = useState<CourtFormData>({
     name: "",
+    courtType: "tennis",
     surfaceType: "hard",
     status: "active",
     hourlyRate: "25.00",
@@ -209,6 +215,7 @@ export default function AdminSettings() {
   const resetForm = () => {
     setFormData({
       name: "",
+      courtType: "tennis",
       surfaceType: "hard",
       status: "active",
       hourlyRate: "25.00",
@@ -225,6 +232,7 @@ export default function AdminSettings() {
     setEditingCourt(court);
     setFormData({
       name: court.name,
+      courtType: court.courtType || "tennis",
       surfaceType: court.surfaceType,
       status: court.status,
       hourlyRate: court.hourlyRate,
@@ -274,6 +282,14 @@ export default function AdminSettings() {
       case "hard": return "bg-blue-100 text-blue-800";
       case "clay": return "bg-orange-100 text-orange-800";
       case "grass": return "bg-green-100 text-green-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getCourtTypeColor = (courtType: string) => {
+    switch (courtType) {
+      case "tennis": return "bg-brand-primary/20 text-brand-primary";
+      case "pickleball": return "bg-brand-accent/20 text-brand-accent";
       default: return "bg-gray-100 text-gray-800";
     }
   };
@@ -448,6 +464,24 @@ export default function AdminSettings() {
                 </div>
 
                 <div>
+                  <Label htmlFor="courtType">Court Type *</Label>
+                  <Select 
+                    value={formData.courtType} 
+                    onValueChange={(value: "tennis" | "pickleball") => 
+                      setFormData(prev => ({ ...prev, courtType: value }))
+                    }
+                  >
+                    <SelectTrigger data-testid="select-court-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tennis">Tennis</SelectItem>
+                      <SelectItem value="pickleball">Pickleball</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
                   <Label htmlFor="surfaceType">Surface Type</Label>
                   <Select 
                     value={formData.surfaceType} 
@@ -572,24 +606,69 @@ export default function AdminSettings() {
 
       {/* Courts List */}
       <Card>
-        <CardHeader>
-          <CardTitle>Facility Courts</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {courts.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No courts configured yet.</p>
-                <Button
-                  onClick={() => setShowAddForm(true)}
-                  className="mt-4 bg-brand-primary hover:bg-brand-primary/90"
+        <CardHeader 
+          className="cursor-pointer hover:bg-gray-50 transition-colors"
+          onClick={() => setCourtsExpanded(!courtsExpanded)}
+        >
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span>Facility Courts</span>
+              <Badge variant="secondary" className="ml-2">
+                {courts.filter(c => (c.courtType || "tennis") === courtTypeFilter).length} {courtTypeFilter}
+              </Badge>
+            </div>
+            <div className="flex items-center space-x-4">
+              {courtsExpanded && (
+                <div 
+                  className="flex bg-gray-100 rounded-full p-1"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Your First Court
-                </Button>
-              </div>
-            ) : (
-              courts.map((court) => (
+                  <button
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                      courtTypeFilter === "tennis"
+                        ? "bg-brand-primary text-white shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                    onClick={() => setCourtTypeFilter("tennis")}
+                  >
+                    Tennis
+                  </button>
+                  <button
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                      courtTypeFilter === "pickleball"
+                        ? "bg-teal-500 text-white shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                    onClick={() => setCourtTypeFilter("pickleball")}
+                  >
+                    Pickleball
+                  </button>
+                </div>
+              )}
+              {courtsExpanded ? (
+                <ChevronUp className="h-5 w-5 text-gray-500" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-gray-500" />
+              )}
+            </div>
+          </CardTitle>
+        </CardHeader>
+        {courtsExpanded && (
+          <CardContent>
+            <div className="space-y-4">
+              {courts.filter(c => (c.courtType || "tennis") === courtTypeFilter).length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No {courtTypeFilter} courts configured yet.</p>
+                  <Button
+                    onClick={() => setShowAddForm(true)}
+                    className="mt-4 bg-brand-primary hover:bg-brand-primary/90"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Your First Court
+                  </Button>
+                </div>
+              ) : (
+                courts.filter(c => (c.courtType || "tennis") === courtTypeFilter).map((court) => (
                 <div
                   key={court.id}
                   className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
@@ -598,6 +677,9 @@ export default function AdminSettings() {
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900">{court.name}</h3>
+                        <Badge className={getCourtTypeColor(court.courtType || "tennis")}>
+                          {(court.courtType || "tennis") === "tennis" ? "Tennis" : "Pickleball"}
+                        </Badge>
                         <Badge className={getSurfaceColor(court.surfaceType)}>
                           {court.surfaceType}
                         </Badge>
@@ -648,6 +730,7 @@ export default function AdminSettings() {
             )}
           </div>
         </CardContent>
+        )}
       </Card>
 
       {/* Staff Account Management */}

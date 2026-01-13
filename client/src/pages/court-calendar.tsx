@@ -80,6 +80,7 @@ export default function CourtCalendar() {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [courtTypeFilter, setCourtTypeFilter] = useState<"tennis" | "pickleball">("tennis");
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
   const [selectedSlot, setSelectedSlot] = useState<{
@@ -196,6 +197,12 @@ export default function CourtCalendar() {
     queryKey: ["/api/users"],
   });
 
+  // Filter courts based on court type toggle (with fallback for courts missing courtType)
+  const filteredCourts = courts.filter((court) => {
+    const type = court.courtType || "tennis";
+    return type === courtTypeFilter;
+  });
+
   // Filter bookings for selected date
   const dayBookings = bookings.filter((booking) => {
     // Parse date string properly to avoid timezone issues
@@ -291,6 +298,23 @@ export default function CourtCalendar() {
       });
     },
   });
+
+  const formatPhoneNumber = (value: string) => {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length === 0) return '';
+    if (cleaned.length < 3) return `(${cleaned}`;
+    if (cleaned.length === 3) return `(${cleaned}) `;
+    if (cleaned.length <= 6) return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+    if (cleaned.length <= 10) {
+      return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    }
+    return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setFormData({ ...formData, customerPhone: formatted });
+  };
 
   const calculateTotal = () => {
     // Class, Event, and Maintenance bookings are FREE
@@ -712,19 +736,34 @@ export default function CourtCalendar() {
             </span>
           </div>
 
-          {/* Legend */}
-          <div className="flex items-center space-x-4 text-sm">
-            <div className="flex items-center space-x-1">
-              <div className="w-3 h-3 bg-blue-500 rounded"></div>
-              <span>Confirmed</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <div className="w-3 h-3 bg-orange-400 rounded"></div>
-              <span>Pending</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <div className="w-3 h-3 bg-gray-400 rounded"></div>
-              <span>Cancelled</span>
+          {/* Tennis / Pickleball Toggle */}
+          <div className="flex items-center">
+            <div className="relative flex bg-gray-200 rounded-full p-1">
+              <button
+                onClick={() => setCourtTypeFilter("tennis")}
+                className={`relative z-10 px-4 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                  courtTypeFilter === "tennis"
+                    ? "text-white"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Tennis
+              </button>
+              <button
+                onClick={() => setCourtTypeFilter("pickleball")}
+                className={`relative z-10 px-4 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                  courtTypeFilter === "pickleball"
+                    ? "text-white"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Pickleball
+              </button>
+              <div
+                className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-brand-primary rounded-full transition-all duration-200 ${
+                  courtTypeFilter === "pickleball" ? "left-[calc(50%+2px)]" : "left-1"
+                }`}
+              />
             </div>
           </div>
         </div>
@@ -734,7 +773,7 @@ export default function CourtCalendar() {
           {/* Fixed Court Headers Row */}
           <div className="flex border-b bg-gray-50 flex-shrink-0">
             <div className="w-16 flex-shrink-0 border-r"></div>
-            {courts.map((court) => (
+            {filteredCourts.map((court) => (
               <div key={court.id} className="flex-1 border-r h-12 flex items-center justify-center">
                 <div className="text-center">
                   <div className="font-medium text-sm">{court.name}</div>
@@ -771,7 +810,7 @@ export default function CourtCalendar() {
 
               {/* Courts Columns */}
               <div className="flex-1 flex relative">
-                {courts.map((court) => (
+                {filteredCourts.map((court) => (
                   <div key={court.id} className="flex-1 border-r relative">
                     {/* Time Slots Grid */}
                     <div className="relative" style={{ height: `${totalGridHeight}px` }}>
@@ -1080,11 +1119,11 @@ export default function CourtCalendar() {
       {/* Booking Popover - Google Calendar Style */}
       {popoverOpen && selectedSlot && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center pt-20"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20"
           onClick={() => setPopoverOpen(false)}
         >
           <div
-            className="bg-white rounded-lg shadow-2xl w-[360px] max-h-[80vh] overflow-y-auto"
+            className="bg-white rounded-lg shadow-2xl w-[400px] max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header with close button */}
@@ -1177,176 +1216,118 @@ export default function CourtCalendar() {
                 </div>
               </div>
 
-              {/* Duration Selector */}
-              <div>
-                <Label className="text-xs text-gray-500 mb-1 block">Duration</Label>
-                <Select
-                  value={formData.duration}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, duration: value })
-                  }
-                >
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0.5">30 min</SelectItem>
-                    <SelectItem value="1">1 hour</SelectItem>
-                    <SelectItem value="1.5">1.5 hours</SelectItem>
-                    <SelectItem value="2">2 hours</SelectItem>
-                    <SelectItem value="3">3 hours</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Customer Selection - Google Calendar Style */}
-              {(formData.bookingType === "regular" ||
-                formData.bookingType === "event") && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <User className="h-5 w-5 text-gray-400" />
-                    <span className="text-sm text-gray-600">Add guest</span>
+              {/* REGULAR BOOKING: Customer Selection Section - FIRST */}
+              {formData.bookingType === "regular" && (
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <User className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">Customer</span>
                   </div>
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Input
-                        value={customerSearchTerm}
-                        onChange={(e) => setCustomerSearchTerm(e.target.value)}
-                        placeholder="Search existing customer"
-                        className="h-8 text-sm border-teal-300 focus:border-teal-500 focus:ring-teal-200"
-                        data-testid="input-customer-search"
-                      />
-                      {customerSearchTerm &&
-                        filteredCustomers.length > 0 &&
-                        !isNewCustomer && (
-                          <div className="absolute top-full left-0 right-0 bg-white border rounded-md shadow-lg z-10 max-h-32 overflow-y-auto">
-                            {filteredCustomers.slice(0, 5).map((customer) => (
-                              <button
-                                key={customer.id}
-                                type="button"
-                                className="w-full text-left px-3 py-2 hover:bg-gray-100 text-xs"
-                                onClick={() => handleCustomerSelect(customer)}
-                                data-testid={`button-select-customer-${customer.id}`}
-                              >
-                                <div className="font-medium">
-                                  {customer.firstName} {customer.lastName}
-                                </div>
-                                <div className="text-gray-500">
-                                  {customer.email}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                    </div>
-
-                    <div className="flex gap-2">
-                      {!selectedCustomer && (
-                        <Button
-                          type="button"
-                          variant={isNewCustomer ? "default" : "outline"}
-                          size="sm"
-                          onClick={handleNewCustomer}
-                          className="text-xs"
-                          data-testid="button-new-customer"
-                        >
-                          New Customer
-                        </Button>
-                      )}
-                      {selectedCustomer && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedCustomer(null);
-                            setCustomerSearchTerm("");
-                            setIsNewCustomer(false);
-                          }}
-                          className="text-xs"
-                          data-testid="button-clear-customer"
-                        >
-                          Clear Selection
-                        </Button>
-                      )}
-                    </div>
+                  
+                  {/* Search Existing Customer */}
+                  <div className="relative">
+                    <Input
+                      value={customerSearchTerm}
+                      onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                      placeholder="Search existing customer..."
+                      className="h-9 text-sm bg-white border-gray-300 focus:border-brand-primary focus:ring-brand-primary/20"
+                      data-testid="input-customer-search"
+                    />
+                    {customerSearchTerm && filteredCustomers.length > 0 && !isNewCustomer && (
+                      <div className="absolute top-full left-0 right-0 bg-white border rounded-md shadow-lg z-10 max-h-32 overflow-y-auto mt-1">
+                        {filteredCustomers.slice(0, 5).map((customer) => (
+                          <button
+                            key={customer.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-gray-100 text-xs border-b last:border-b-0"
+                            onClick={() => handleCustomerSelect(customer)}
+                            data-testid={`button-select-customer-${customer.id}`}
+                          >
+                            <div className="font-medium">{customer.firstName} {customer.lastName}</div>
+                            <div className="text-gray-500">{customer.email}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-
-              {/* Customer Details - Only show for regular bookings and events */}
-              {(formData.bookingType === "regular" ||
-                formData.bookingType === "event") &&
-                (isNewCustomer || Boolean(selectedCustomer)) && (
-                  <>
-                    <div>
-                      <Label className="text-xs">Customer Name</Label>
-                      <Input
-                        value={formData.customerName}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            customerName: e.target.value,
-                          })
-                        }
-                        placeholder="John Doe"
-                        className="h-8 text-sm"
-                        disabled={!isNewCustomer && Boolean(selectedCustomer)}
-                        required
-                        data-testid="input-customer-name"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
+                  
+                  {/* New Customer Button */}
+                  <div className="flex gap-2">
+                    {!selectedCustomer && (
+                      <Button
+                        type="button"
+                        variant={isNewCustomer ? "default" : "outline"}
+                        size="sm"
+                        onClick={handleNewCustomer}
+                        className={`text-xs ${isNewCustomer ? 'bg-brand-primary hover:bg-brand-primary/90' : 'bg-white hover:bg-gray-100'}`}
+                        data-testid="button-new-customer"
+                      >
+                        {isNewCustomer ? "Creating New Customer" : "New Customer"}
+                      </Button>
+                    )}
+                    {selectedCustomer && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCustomer(null);
+                          setCustomerSearchTerm("");
+                          setIsNewCustomer(false);
+                        }}
+                        className="text-xs bg-white"
+                        data-testid="button-clear-customer"
+                      >
+                        Clear Selection
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {/* New Customer Form - Expanded */}
+                  {isNewCustomer && (
+                    <div className="bg-white rounded-lg p-3 border border-gray-200 space-y-3 mt-2">
                       <div>
-                        <Label className="text-xs">Email</Label>
+                        <Label className="text-xs font-medium text-gray-600">Customer Name *</Label>
                         <Input
-                          type="email"
-                          value={formData.customerEmail}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              customerEmail: e.target.value,
-                            })
-                          }
-                          placeholder="john@example.com"
-                          className="h-8 text-sm"
-                          disabled={!isNewCustomer && Boolean(selectedCustomer)}
+                          value={formData.customerName}
+                          onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                          placeholder="John Doe"
+                          className="h-9 text-sm mt-1 bg-gray-50 border-gray-300"
                           required
-                          data-testid="input-customer-email"
+                          data-testid="input-customer-name"
                         />
                       </div>
-                      <div>
-                        <Label className="text-xs">Phone</Label>
-                        <Input
-                          value={formData.customerPhone}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              customerPhone: e.target.value,
-                            })
-                          }
-                          placeholder="(555) 123-4567"
-                          className="h-8 text-sm"
-                          disabled={!isNewCustomer && Boolean(selectedCustomer)}
-                          data-testid="input-customer-phone"
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs font-medium text-gray-600">Email *</Label>
+                          <Input
+                            type="email"
+                            value={formData.customerEmail}
+                            onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
+                            placeholder="john@example.com"
+                            className="h-9 text-sm mt-1 bg-gray-50 border-gray-300"
+                            required
+                            data-testid="input-customer-email"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs font-medium text-gray-600">Phone</Label>
+                          <Input
+                            value={formData.customerPhone}
+                            onChange={handlePhoneChange}
+                            placeholder="+1 (555) 123-4567"
+                            className="h-9 text-sm mt-1 bg-gray-50 border-gray-300"
+                            data-testid="input-customer-phone"
+                          />
+                        </div>
                       </div>
-                    </div>
-
-                    {isNewCustomer && (
                       <div>
-                        <Label className="text-xs">Customer Type</Label>
+                        <Label className="text-xs font-medium text-gray-600">Customer Type</Label>
                         <Select
                           value={formData.customerType}
-                          onValueChange={(value) =>
-                            setFormData({ ...formData, customerType: value })
-                          }
+                          onValueChange={(value) => setFormData({ ...formData, customerType: value })}
                         >
-                          <SelectTrigger
-                            className="h-8 text-sm"
-                            data-testid="select-customer-type"
-                          >
+                          <SelectTrigger className="h-9 text-sm mt-1 bg-gray-50 border-gray-300" data-testid="select-customer-type">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1356,56 +1337,222 @@ export default function CourtCalendar() {
                           </SelectContent>
                         </Select>
                       </div>
+                    </div>
+                  )}
+                  
+                  {/* Selected Customer Display */}
+                  {selectedCustomer && !isNewCustomer && (
+                    <div className="bg-white rounded-lg p-3 border border-gray-200">
+                      <div className="text-sm font-medium text-gray-900">{formData.customerName}</div>
+                      <div className="text-xs text-gray-500">{formData.customerEmail}</div>
+                      {formData.customerPhone && <div className="text-xs text-gray-500">{formData.customerPhone}</div>}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* REGULAR BOOKING: Duration */}
+              {formData.bookingType === "regular" && (
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <Label className="text-xs font-medium text-gray-600 mb-2 block">Duration</Label>
+                  <Select
+                    value={formData.duration}
+                    onValueChange={(value) => setFormData({ ...formData, duration: value })}
+                  >
+                    <SelectTrigger className="h-9 text-sm bg-white border-gray-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0.5">30 min</SelectItem>
+                      <SelectItem value="1">1 hour</SelectItem>
+                      <SelectItem value="1.5">1.5 hours</SelectItem>
+                      <SelectItem value="2">2 hours</SelectItem>
+                      <SelectItem value="3">3 hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* REGULAR BOOKING: Notes */}
+              {formData.bookingType === "regular" && (
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <Label className="text-xs font-medium text-gray-600 mb-2 block">Notes</Label>
+                  <Input
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Special requests or notes..."
+                    className="h-9 text-sm bg-white border-gray-300"
+                    data-testid="input-notes"
+                  />
+                </div>
+              )}
+
+              {/* REGULAR BOOKING: Payment Method */}
+              {formData.bookingType === "regular" && (
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <Label className="text-xs font-medium text-gray-600 mb-2 block">Payment Method *</Label>
+                  <Select
+                    value={formData.paymentMethod}
+                    onValueChange={(value) => setFormData({ ...formData, paymentMethod: value })}
+                  >
+                    <SelectTrigger className="h-9 text-sm bg-white border-gray-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="credit_card">Credit Card</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="check">Check</SelectItem>
+                      <SelectItem value="venmo">Venmo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* EVENT: Customer Selection and Details */}
+              {formData.bookingType === "event" && (
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <User className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">Event Organizer</span>
+                  </div>
+                  
+                  <div className="relative">
+                    <Input
+                      value={customerSearchTerm}
+                      onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                      placeholder="Search existing customer..."
+                      className="h-9 text-sm bg-white border-gray-300 focus:border-brand-primary"
+                      data-testid="input-customer-search"
+                    />
+                    {customerSearchTerm && filteredCustomers.length > 0 && !isNewCustomer && (
+                      <div className="absolute top-full left-0 right-0 bg-white border rounded-md shadow-lg z-10 max-h-32 overflow-y-auto mt-1">
+                        {filteredCustomers.slice(0, 5).map((customer) => (
+                          <button
+                            key={customer.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-gray-100 text-xs border-b last:border-b-0"
+                            onClick={() => handleCustomerSelect(customer)}
+                            data-testid={`button-select-customer-${customer.id}`}
+                          >
+                            <div className="font-medium">{customer.firstName} {customer.lastName}</div>
+                            <div className="text-gray-500">{customer.email}</div>
+                          </button>
+                        ))}
+                      </div>
                     )}
-                  </>
-                )}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    {!selectedCustomer && (
+                      <Button
+                        type="button"
+                        variant={isNewCustomer ? "default" : "outline"}
+                        size="sm"
+                        onClick={handleNewCustomer}
+                        className={`text-xs ${isNewCustomer ? 'bg-brand-primary hover:bg-brand-primary/90' : 'bg-white hover:bg-gray-100'}`}
+                        data-testid="button-new-customer"
+                      >
+                        {isNewCustomer ? "Creating New Contact" : "New Contact"}
+                      </Button>
+                    )}
+                    {selectedCustomer && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCustomer(null);
+                          setCustomerSearchTerm("");
+                          setIsNewCustomer(false);
+                        }}
+                        className="text-xs bg-white"
+                        data-testid="button-clear-customer"
+                      >
+                        Clear Selection
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {isNewCustomer && (
+                    <div className="bg-white rounded-lg p-3 border border-gray-200 space-y-3 mt-2">
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">Contact Name *</Label>
+                        <Input
+                          value={formData.customerName}
+                          onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                          placeholder="Contact name"
+                          className="h-9 text-sm mt-1 bg-gray-50 border-gray-300"
+                          required
+                          data-testid="input-customer-name"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs font-medium text-gray-600">Email *</Label>
+                          <Input
+                            type="email"
+                            value={formData.customerEmail}
+                            onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
+                            placeholder="email@example.com"
+                            className="h-9 text-sm mt-1 bg-gray-50 border-gray-300"
+                            required
+                            data-testid="input-customer-email"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs font-medium text-gray-600">Phone</Label>
+                          <Input
+                            value={formData.customerPhone}
+                            onChange={handlePhoneChange}
+                            placeholder="+1 (555) 123-4567"
+                            className="h-9 text-sm mt-1 bg-gray-50 border-gray-300"
+                            data-testid="input-customer-phone"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedCustomer && !isNewCustomer && (
+                    <div className="bg-white rounded-lg p-3 border border-gray-200">
+                      <div className="text-sm font-medium text-gray-900">{formData.customerName}</div>
+                      <div className="text-xs text-gray-500">{formData.customerEmail}</div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Event-specific fields */}
               {formData.bookingType === "event" && (
-                <div className="bg-orange-50 p-3 rounded border border-orange-200 space-y-3">
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-3">
                   <div>
-                    <Label className="text-xs font-medium text-orange-700">
-                      Name of Event *
-                    </Label>
+                    <Label className="text-xs font-medium text-gray-600">Event Name *</Label>
                     <Input
                       value={formData.description || ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          description: e.target.value,
-                        })
-                      }
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       placeholder="e.g., Summer Tournament, Corporate Team Building"
-                      className="h-8 text-sm mt-1"
+                      className="h-9 text-sm mt-1 bg-white border-gray-300"
                       required
                       data-testid="input-event-name"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-medium text-orange-700">
-                      Event Description
-                    </Label>
+                    <Label className="text-xs font-medium text-gray-600">Event Description</Label>
                     <Input
                       value={formData.notes || ""}
-                      onChange={(e) =>
-                        setFormData({ ...formData, notes: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       placeholder="Additional details about the event..."
-                      className="h-8 text-sm mt-1"
+                      className="h-9 text-sm mt-1 bg-white border-gray-300"
                       data-testid="input-event-description"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-medium text-orange-700">
-                      Duration (hours)
-                    </Label>
+                    <Label className="text-xs font-medium text-gray-600">Duration</Label>
                     <Select
                       value={formData.duration}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, duration: value })
-                      }
+                      onValueChange={(value) => setFormData({ ...formData, duration: value })}
                     >
-                      <SelectTrigger className="h-8 text-sm">
+                      <SelectTrigger className="h-9 text-sm bg-white border-gray-300">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1426,87 +1573,74 @@ export default function CourtCalendar() {
 
               {/* Class-specific fields */}
               {formData.bookingType === "class" && (
-                <div className="bg-green-50 p-3 rounded border border-green-200 space-y-3">
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-3">
                   <div>
-                    <Label className="text-xs font-medium text-green-700">
-                      Class Name *
-                    </Label>
+                    <Label className="text-xs font-medium text-gray-600">Class Name *</Label>
                     <Input
                       value={formData.description || ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          description: e.target.value,
-                        })
-                      }
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       placeholder="e.g., Beginner Tennis, Advanced Pickleball"
-                      className="h-8 text-sm mt-1"
+                      className="h-9 text-sm mt-1 bg-white border-gray-300"
                       required
                       data-testid="input-class-name"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-medium text-green-700">
-                      Recurring Days
-                    </Label>
+                    <Label className="text-xs font-medium text-gray-600">Duration</Label>
+                    <Select
+                      value={formData.duration}
+                      onValueChange={(value) => setFormData({ ...formData, duration: value })}
+                    >
+                      <SelectTrigger className="h-9 text-sm bg-white border-gray-300">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0.5">30 min</SelectItem>
+                        <SelectItem value="1">1 hour</SelectItem>
+                        <SelectItem value="1.5">1.5 hours</SelectItem>
+                        <SelectItem value="2">2 hours</SelectItem>
+                        <SelectItem value="3">3 hours</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-600">Recurring Days</Label>
                     <div className="grid grid-cols-7 gap-1 mt-1">
-                      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
-                        (day) => (
-                          <label
-                            key={day}
-                            className="flex items-center justify-center"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={
-                                formData.recurringDays?.includes(day) || false
+                      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                        <label key={day} className="flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={formData.recurringDays?.includes(day) || false}
+                            onChange={(e) => {
+                              const days = formData.recurringDays || [];
+                              if (e.target.checked) {
+                                setFormData({ ...formData, recurringDays: [...days, day] });
+                              } else {
+                                setFormData({ ...formData, recurringDays: days.filter((d) => d !== day) });
                               }
-                              onChange={(e) => {
-                                const days = formData.recurringDays || [];
-                                if (e.target.checked) {
-                                  setFormData({
-                                    ...formData,
-                                    recurringDays: [...days, day],
-                                  });
-                                } else {
-                                  setFormData({
-                                    ...formData,
-                                    recurringDays: days.filter(
-                                      (d) => d !== day,
-                                    ),
-                                  });
-                                }
-                              }}
-                              className="sr-only"
-                            />
-                            <span
-                              className={`text-xs px-2 py-1 rounded cursor-pointer ${
-                                formData.recurringDays?.includes(day)
-                                  ? "bg-green-500 text-white"
-                                  : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-                              }`}
-                            >
-                              {day}
-                            </span>
-                          </label>
-                        ),
-                      )}
+                            }}
+                            className="sr-only"
+                          />
+                          <span
+                            className={`text-xs px-2 py-1 rounded cursor-pointer ${
+                              formData.recurringDays?.includes(day)
+                                ? "bg-brand-primary text-white"
+                                : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
+                            }`}
+                          >
+                            {day}
+                          </span>
+                        </label>
+                      ))}
                     </div>
                   </div>
                   <div>
-                    <Label className="text-xs font-medium text-green-700">
-                      End Date (Recurring Until)
-                    </Label>
+                    <Label className="text-xs font-medium text-gray-600">End Date (Recurring Until)</Label>
                     <Input
                       type="date"
                       value={formData.recurringEndDate || ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          recurringEndDate: e.target.value,
-                        })
-                      }
-                      className="h-8 text-sm mt-1"
+                      onChange={(e) => setFormData({ ...formData, recurringEndDate: e.target.value })}
+                      className="h-9 text-sm mt-1 bg-white border-gray-300"
                       min={format(selectedDate, "yyyy-MM-dd")}
                       data-testid="input-recurring-end"
                     />
@@ -1516,50 +1650,35 @@ export default function CourtCalendar() {
 
               {/* Maintenance-specific fields */}
               {formData.bookingType === "maintenance" && (
-                <div className="bg-gray-50 p-3 rounded border border-gray-400 space-y-3">
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-3">
                   <div>
-                    <Label className="text-xs font-medium text-gray-700">
-                      Maintenance Type *
-                    </Label>
+                    <Label className="text-xs font-medium text-gray-600">Maintenance Type *</Label>
                     <Input
                       value={formData.description || ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          description: e.target.value,
-                        })
-                      }
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       placeholder="e.g., Court Resurfacing, Net Replacement"
-                      className="h-8 text-sm mt-1"
+                      className="h-9 text-sm mt-1 bg-white border-gray-300"
                       required
                       data-testid="input-maintenance-type"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-medium text-gray-700">
-                      Description
-                    </Label>
+                    <Label className="text-xs font-medium text-gray-600">Description</Label>
                     <Input
                       value={formData.notes || ""}
-                      onChange={(e) =>
-                        setFormData({ ...formData, notes: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       placeholder="Details about the maintenance work..."
-                      className="h-8 text-sm mt-1"
+                      className="h-9 text-sm mt-1 bg-white border-gray-300"
                       data-testid="input-maintenance-description"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-medium text-gray-700">
-                      Duration (hours)
-                    </Label>
+                    <Label className="text-xs font-medium text-gray-600">Duration</Label>
                     <Select
                       value={formData.duration}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, duration: value })
-                      }
+                      onValueChange={(value) => setFormData({ ...formData, duration: value })}
                     >
-                      <SelectTrigger className="h-8 text-sm">
+                      <SelectTrigger className="h-9 text-sm bg-white border-gray-300">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1576,48 +1695,6 @@ export default function CourtCalendar() {
                 </div>
               )}
 
-              {/* Payment section - only for regular bookings */}
-              {formData.bookingType === "regular" && (
-                <div className="bg-white p-3 rounded border border-orange-200">
-                  <Label className="text-xs font-medium text-orange-700">
-                    Payment Method *
-                  </Label>
-                  <Select
-                    value={formData.paymentMethod}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, paymentMethod: value })
-                    }
-                  >
-                    <SelectTrigger className="h-8 text-sm border-orange-300 focus:border-orange-500 focus:ring-orange-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="credit_card">Credit Card</SelectItem>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="check">Check</SelectItem>
-                      <SelectItem value="venmo">Venmo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* General notes - only for regular bookings */}
-              {formData.bookingType === "regular" && (
-                <div>
-                  <Label className="text-xs font-medium text-gray-700">
-                    Notes
-                  </Label>
-                  <Input
-                    value={formData.notes}
-                    onChange={(e) =>
-                      setFormData({ ...formData, notes: e.target.value })
-                    }
-                    placeholder="Special requests..."
-                    className="h-8 text-sm border-gray-300 focus:border-blue-500 focus:ring-blue-200"
-                    data-testid="input-notes"
-                  />
-                </div>
-              )}
 
               {/* Footer - Google Calendar Style */}
               <div className="flex items-center justify-between pt-4 border-t mt-4">

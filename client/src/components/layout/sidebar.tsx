@@ -1,8 +1,8 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useSidebar } from "@/contexts/sidebar-context";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import { 
   Home, 
   Calendar,
@@ -14,12 +14,11 @@ import {
   X,
   Users
 } from "lucide-react";
-import { useState } from "react";
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { isCollapsed, toggleCollapsed } = useSidebar();
 
   if (location === "/login" || !user) {
     return null;
@@ -53,7 +52,7 @@ export default function Sidebar() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={toggleCollapsed}
             className="ml-auto"
           >
             {isCollapsed ? <Menu className="h-5 w-5" /> : <X className="h-5 w-5" />}

@@ -65,11 +65,18 @@ Preferred communication style: Simple, everyday language.
 - **Edit Modal**: Enhanced edit reservation modal with booking type-specific fields matching creation forms
 
 ### UI/UX Improvements
-- Color-coded booking forms: Green (Class), Orange (Event), Gray (Maintenance), Blue (Regular)
 - Custom TimePicker component with 15-minute increments integrated throughout the system
 - Fixed customer search dropdown to immediately hide after selection
 - Improved calendar grid to display booking-specific information based on type
 - Added proper AM/PM time format display across Court Calendar and My Bookings pages
+
+### Booking Modal Redesign (January 2026)
+- **Consistent Visual Styling**: All booking form sections use unified gray backgrounds with consistent borders
+- **Improved Field Ordering**: Regular tab shows Customer selection first, then Duration, Notes, Payment Method
+- **Phone Auto-Formatting**: Phone input automatically formats as +1 (XXX) XXX-XXXX as user types
+- **Better Modal Sizing**: Modal is centered and sized to accommodate New Customer form without excessive scrolling
+- **Consistent Across Tabs**: Event, Class, and Maintenance tabs all use the same gray styling pattern
+- **Collapsible Admin Sections**: Facility Courts section in Admin Settings is collapsible with Tennis/Pickleball filter
 
 ### Data Management
 - Extended booking schema to support description, recurringDays, and recurringEndDate fields
