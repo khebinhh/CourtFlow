@@ -12,6 +12,7 @@ replit.nix
 .upm/
 .config/
 .cache/
+replit.md
 
 # Attached assets
 attached_assets/
