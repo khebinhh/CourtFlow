@@ -46,6 +46,7 @@ export const bookings = pgTable("bookings", {
   description: text("description"),
   recurringDays: text("recurring_days").array(),
   recurringEndDate: text("recurring_end_date"),
+  participants: text("participants").array(), // Array of player names for reservations (up to 4)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

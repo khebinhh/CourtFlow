@@ -74,6 +74,15 @@ interface Customer {
   role: string;
 }
 
+interface PlayerEntry {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  isNew: boolean;
+  customerId?: string;
+}
+
 export default function CourtCalendar() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -102,6 +111,18 @@ export default function CourtCalendar() {
     null,
   );
   const [customerSearchTerm, setCustomerSearchTerm] = useState("");
+  
+  // Multi-player state
+  const [players, setPlayers] = useState<PlayerEntry[]>([]);
+  const [isAddingPlayer, setIsAddingPlayer] = useState(false);
+  const [addPlayerSearchTerm, setAddPlayerSearchTerm] = useState("");
+  const [isAddingNewPlayer, setIsAddingNewPlayer] = useState(false);
+  const [newPlayerData, setNewPlayerData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    customerType: "guest",
+  });
   const [editingBooking, setEditingBooking] =
     useState<BookingWithDetails | null>(null);
   const [editFormData, setEditFormData] = useState<{
@@ -450,6 +471,58 @@ export default function CourtCalendar() {
     setCustomerSearchTerm("");
   };
 
+  // Multi-player handlers
+  const addPlayerFromCustomer = (customer: Customer) => {
+    if (players.length >= 4) return;
+    if (players.some(p => p.email === customer.email)) {
+      toast({ title: "Player already added", variant: "destructive" });
+      return;
+    }
+    setPlayers([...players, {
+      id: customer.id,
+      name: `${customer.firstName} ${customer.lastName}`,
+      email: customer.email,
+      phone: customer.phone || undefined,
+      isNew: false,
+      customerId: customer.id,
+    }]);
+    setAddPlayerSearchTerm("");
+    setIsAddingPlayer(false);
+  };
+
+  const addNewPlayer = () => {
+    if (players.length >= 4) return;
+    if (!newPlayerData.name || !newPlayerData.email) {
+      toast({ title: "Name and email are required", variant: "destructive" });
+      return;
+    }
+    if (players.some(p => p.email === newPlayerData.email)) {
+      toast({ title: "Player already added", variant: "destructive" });
+      return;
+    }
+    setPlayers([...players, {
+      id: `new-${Date.now()}`,
+      name: newPlayerData.name,
+      email: newPlayerData.email,
+      phone: newPlayerData.phone || undefined,
+      isNew: true,
+    }]);
+    setNewPlayerData({ name: "", email: "", phone: "", customerType: "guest" });
+    setIsAddingNewPlayer(false);
+    setIsAddingPlayer(false);
+  };
+
+  const removePlayer = (playerId: string) => {
+    setPlayers(players.filter(p => p.id !== playerId));
+  };
+
+  const cancelAddPlayer = () => {
+    setIsAddingPlayer(false);
+    setIsAddingNewPlayer(false);
+    setAddPlayerSearchTerm("");
+    setNewPlayerData({ name: "", email: "", phone: "", customerType: "guest" });
+  };
+
   const filteredCustomers = customers.filter(
     (customer) =>
       `${customer.firstName} ${customer.lastName}`
@@ -554,6 +627,11 @@ export default function CourtCalendar() {
       }
     }
 
+    // Collect all participant names (primary customer + additional players)
+    const allParticipants = formData.bookingType === "regular" 
+      ? [formData.customerName, ...players.map(p => p.name)].filter(Boolean)
+      : null;
+
     const bookingData = {
       courtId: formData.courtId,
       userId: customerId,
@@ -567,6 +645,7 @@ export default function CourtCalendar() {
       description: formData.description || null,
       recurringDays: formData.recurringDays || null,
       recurringEndDate: formData.recurringEndDate || null,
+      participants: allParticipants,
     };
 
     createBookingMutation.mutate(bookingData);
@@ -594,6 +673,12 @@ export default function CourtCalendar() {
     setSelectedCustomer(null);
     setIsNewCustomer(false);
     setCustomerSearchTerm("");
+    // Reset multi-player state
+    setPlayers([]);
+    setIsAddingPlayer(false);
+    setAddPlayerSearchTerm("");
+    setIsAddingNewPlayer(false);
+    setNewPlayerData({ name: "", email: "", phone: "", customerType: "guest" });
   };
 
   const getBookingPosition = (booking: BookingWithDetails) => {
@@ -1123,11 +1208,12 @@ export default function CourtCalendar() {
           onClick={() => setPopoverOpen(false)}
         >
           <div
-            className="bg-white rounded-lg shadow-2xl w-[400px] max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-lg shadow-2xl w-[420px] flex flex-col"
+            style={{ maxHeight: 'min(90vh, 700px)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header with close button */}
-            <div className="flex items-center justify-end p-2 border-b">
+            {/* Fixed Header with close button */}
+            <div className="flex items-center justify-end p-2 border-b flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setPopoverOpen(false)}
@@ -1137,7 +1223,9 @@ export default function CourtCalendar() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-4 space-y-4">
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              {/* Scrollable Content Area */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Booking Type Tabs - Google Calendar Style */}
               <div className="flex border-b">
                 <button
@@ -1346,6 +1434,173 @@ export default function CourtCalendar() {
                       <div className="text-sm font-medium text-gray-900">{formData.customerName}</div>
                       <div className="text-xs text-gray-500">{formData.customerEmail}</div>
                       {formData.customerPhone && <div className="text-xs text-gray-500">{formData.customerPhone}</div>}
+                    </div>
+                  )}
+
+                  {/* Additional Players Section */}
+                  {(selectedCustomer || isNewCustomer) && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <User className="h-4 w-4 text-gray-500" />
+                        <span className="text-xs font-medium text-gray-600">Other Players</span>
+                      </div>
+                      
+                      {/* List of added players */}
+                      {players.length > 0 && (
+                        <div className="space-y-2 mb-2">
+                          {players.map((player) => (
+                            <div key={player.id} className="flex items-center justify-between bg-white rounded p-2 border border-gray-200">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{player.name}</div>
+                                <div className="text-xs text-gray-500">{player.email}</div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removePlayer(player.id)}
+                                className="p-1 hover:bg-gray-100 rounded-full"
+                              >
+                                <X className="h-4 w-4 text-gray-400" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add Another Player Button (up to 4 total including primary) */}
+                      {players.length < 3 && !isAddingPlayer && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsAddingPlayer(true)}
+                          className="text-xs bg-white hover:bg-gray-100 w-full"
+                        >
+                          + Add another player
+                        </Button>
+                      )}
+
+                      {/* Add Player Interface */}
+                      {isAddingPlayer && (
+                        <div className="bg-white rounded-lg p-3 border border-gray-200 space-y-3">
+                          {!isAddingNewPlayer ? (
+                            <>
+                              {/* Search for existing player */}
+                              <div className="relative">
+                                <Input
+                                  value={addPlayerSearchTerm}
+                                  onChange={(e) => setAddPlayerSearchTerm(e.target.value)}
+                                  placeholder="Search existing customer..."
+                                  className="h-9 text-sm bg-gray-50 border-gray-300"
+                                />
+                                {addPlayerSearchTerm && (
+                                  <div className="absolute top-full left-0 right-0 bg-white border rounded-md shadow-lg z-10 max-h-32 overflow-y-auto mt-1">
+                                    {customers
+                                      .filter(c => 
+                                        (`${c.firstName} ${c.lastName}`.toLowerCase().includes(addPlayerSearchTerm.toLowerCase()) ||
+                                        c.email.toLowerCase().includes(addPlayerSearchTerm.toLowerCase())) &&
+                                        c.email !== formData.customerEmail &&
+                                        !players.some(p => p.email === c.email)
+                                      )
+                                      .slice(0, 5)
+                                      .map((customer) => (
+                                        <button
+                                          key={customer.id}
+                                          type="button"
+                                          className="w-full text-left px-3 py-2 hover:bg-gray-100 text-xs border-b last:border-b-0"
+                                          onClick={() => addPlayerFromCustomer(customer)}
+                                        >
+                                          <div className="font-medium">{customer.firstName} {customer.lastName}</div>
+                                          <div className="text-gray-500">{customer.email}</div>
+                                        </button>
+                                      ))}
+                                    {customers.filter(c => 
+                                      (`${c.firstName} ${c.lastName}`.toLowerCase().includes(addPlayerSearchTerm.toLowerCase()) ||
+                                      c.email.toLowerCase().includes(addPlayerSearchTerm.toLowerCase())) &&
+                                      c.email !== formData.customerEmail &&
+                                      !players.some(p => p.email === c.email)
+                                    ).length === 0 && (
+                                      <div className="px-3 py-2 text-xs text-gray-500">No customers found</div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setIsAddingNewPlayer(true)}
+                                  className="text-xs bg-white flex-1"
+                                >
+                                  New Player
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={cancelAddPlayer}
+                                  className="text-xs"
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {/* New Player Form */}
+                              <div>
+                                <Label className="text-xs font-medium text-gray-600">Name *</Label>
+                                <Input
+                                  value={newPlayerData.name}
+                                  onChange={(e) => setNewPlayerData({ ...newPlayerData, name: e.target.value })}
+                                  placeholder="Player name"
+                                  className="h-9 text-sm mt-1 bg-gray-50 border-gray-300"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label className="text-xs font-medium text-gray-600">Email *</Label>
+                                  <Input
+                                    type="email"
+                                    value={newPlayerData.email}
+                                    onChange={(e) => setNewPlayerData({ ...newPlayerData, email: e.target.value })}
+                                    placeholder="email@example.com"
+                                    className="h-9 text-sm mt-1 bg-gray-50 border-gray-300"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs font-medium text-gray-600">Phone</Label>
+                                  <Input
+                                    value={newPlayerData.phone}
+                                    onChange={(e) => setNewPlayerData({ ...newPlayerData, phone: formatPhoneNumber(e.target.value) })}
+                                    placeholder="+1 (555) 123-4567"
+                                    className="h-9 text-sm mt-1 bg-gray-50 border-gray-300"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={addNewPlayer}
+                                  className="text-xs bg-brand-primary hover:bg-brand-primary/90 flex-1"
+                                >
+                                  Add Player
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={cancelAddPlayer}
+                                  className="text-xs"
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1696,8 +1951,10 @@ export default function CourtCalendar() {
               )}
 
 
-              {/* Footer - Google Calendar Style */}
-              <div className="flex items-center justify-between pt-4 border-t mt-4">
+              </div>
+
+              {/* Sticky Footer - Google Calendar Style */}
+              <div className="flex items-center justify-between p-4 border-t bg-white flex-shrink-0">
                 <div className="text-sm">
                   {formData.bookingType === "regular" && (
                     <span className="font-medium">${calculateTotal()}</span>
